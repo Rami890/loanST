@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NGO Loan Planner</title>
+<title>Loan Planner</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
@@ -325,7 +325,7 @@
 <body>
 
 <header>
-  <h1>NGO Loan Planner</h1>
+  <h1>Loan Planner</h1>
   <p>10-year repayment · ₪1,000,000 at ₪12,500/month · 30 founding families</p>
 </header>
 
@@ -748,15 +748,30 @@ function renderCompare() {
   // Chart: reserve comparison
   makeChart('c-comp-reserve', {
     type: 'line',
-    data: { labels: LABELS, datasets: results.map((r, i) => ({
-      label: `Scenario ${CMP_LABELS[i]}`,
-      data: r.reserve,
-      borderColor: CMP_COLORS[i],
-      backgroundColor: CMP_COLORS[i] + '18',
-      fill: false, pointRadius: 0, borderWidth: 2, tension: 0.1,
-    }))},
+    data: { labels: LABELS, datasets: [
+      ...results.map((r, i) => ({
+        label: `Scenario ${CMP_LABELS[i]}`,
+        data: r.reserve,
+        borderColor: CMP_COLORS[i],
+        backgroundColor: CMP_COLORS[i] + '18',
+        fill: false, pointRadius: 0, borderWidth: 2, tension: 0.1,
+      })),
+      {
+        label: 'Zero',
+        data: Array(MONTHS).fill(0),
+        borderColor: '#ff5f57',
+        borderDash: [5, 4],
+        borderWidth: 1.5,
+        pointRadius: 0,
+        fill: false,
+        backgroundColor: 'transparent',
+      }
+    ]},
     options: { responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${nis(ctx.parsed.y)}`}} },
+      plugins:{ legend:{display:false}, tooltip:{
+        callbacks:{ label: ctx => ctx.dataset.label === 'Zero' ? null : `${ctx.dataset.label}: ${nis(ctx.parsed.y)}` },
+        filter: item => item.dataset.label !== 'Zero',
+      }},
       scales:{ x:{ticks:TICK_OPTS,grid:GRID_OPTS}, y:{ticks:{font:{size:9},color:'#7a8099',callback:NIS_K},grid:GRID_OPTS} }
     }
   });
