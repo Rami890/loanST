@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NGO Loan Planner</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg:        #0f1117;
+    --surface:   #181c27;
+    --surface2:  #1e2333;
+    --border:    #2a2f42;
+    --text:      #e8eaf0;
+    --muted:     #7a8099;
+    --blue:      #4a9eff;
+    --green:     #2dd4a0;
+    --amber:     #f5a623;
+    --red:       #ff5f57;
+    --purple:    #9b8cff;
+    --radius:    10px;
+    --mono:      'DM Mono', monospace;
+    --sans:      'DM Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    padding: 2rem 2.5rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+  header h1 {
+    font-family: var(--mono);
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--green);
+    letter-spacing: -0.01em;
+  }
+  header p {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* ── Layout ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 0;
+    min-height: calc(100vh - 70px);
+  }
+
+  /* ── Sidebar ── */
+  aside {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 1.5rem 1.25rem;
+    overflow-y: auto;
+  }
+
+  .sidebar-section {
+    margin-bottom: 1.75rem;
+  }
+  .sidebar-section:last-child { margin-bottom: 0; }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 0.85rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ctrl { margin-bottom: 1rem; }
+  .ctrl:last-child { margin-bottom: 0; }
+  .ctrl-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 5px;
+  }
+  .ctrl-name { font-size: 12px; color: var(--muted); }
+  .ctrl-val {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--green);
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+  input[type=range].blue::-webkit-slider-thumb  { background: var(--blue); }
+  input[type=range].amber::-webkit-slider-thumb { background: var(--amber); }
+  input[type=range].purple::-webkit-slider-thumb{ background: var(--purple); }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 1.25rem 0;
+  }
+
+  /* Toggle */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 0.5rem;
+  }
+  .toggle {
+    position: relative;
+    width: 40px; height: 22px;
+    flex-shrink: 0;
+  }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-track {
+    position: absolute; inset: 0;
+    background: var(--border);
+    border-radius: 11px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .toggle input:checked ~ .toggle-track { background: var(--green); }
+  .toggle-track::after {
+    content: '';
+    position: absolute;
+    left: 3px; top: 3px;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: white;
+    transition: transform 0.2s;
+  }
+  .toggle input:checked ~ .toggle-track::after { transform: translateX(18px); }
+  .toggle-label { font-size: 12px; color: var(--muted); }
+
+  /* ── Metrics strip ── */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .metric {
+    background: var(--surface);
+    padding: 0.85rem 1rem;
+  }
+  .metric-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+  .metric-value { font-family: var(--mono); font-size: 16px; font-weight: 500; }
+  .metric-value.good  { color: var(--green); }
+  .metric-value.bad   { color: var(--red); }
+  .metric-value.warn  { color: var(--amber); }
+  .metric-value.plain { color: var(--text); }
+
+  /* ── Main content ── */
+  main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .chart-area {
+    flex: 1;
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .chart-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem 0.85rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.6rem;
+  }
+  .chart-title-text {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .legend {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .leg-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--muted); }
+  .leg-dot { width: 10px; height: 3px; border-radius: 1px; flex-shrink: 0; }
+
+  .chart-wrap { flex: 1; position: relative; min-height: 0; }
+  canvas { display: block; }
+
+  /* ── Timeline table ── */
+  .timeline {
+    margin-top: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .timeline-header {
+    background: var(--surface2);
+    padding: 0.6rem 1rem;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .timeline-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 1rem;
+    padding: 0.5rem 1rem;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    align-items: center;
+  }
+  .timeline-event { color: var(--text); }
+  .timeline-month { font-family: var(--mono); color: var(--muted); white-space: nowrap; }
+  .timeline-balance { font-family: var(--mono); font-size: 11px; white-space: nowrap; }
+
+  /* ── Scenario tabs ── */
+  .tab-bar {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    padding: 0 1.25rem;
+    background: var(--surface);
+  }
+  .tab {
+    padding: 0.6rem 1rem;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.15s;
+    user-select: none;
+  }
+  .tab.active { color: var(--text); border-color: var(--green); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  /* ── Comparison mode ── */
+  #compare-panel { display: none; }
+  #compare-panel.visible { display: block; }
+  #single-panel { display: block; }
+  #single-panel.hidden { display: none; }
+
+  .scenario-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 1rem;
+  }
+  .scenario-col {
+    background: var(--surface);
+    padding: 0.85rem 1rem;
+  }
+  .scenario-col-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    margin-bottom: 0.65rem;
+  }
+  .sc-metric { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; }
+  .sc-label { color: var(--muted); }
+  .sc-val { font-family: var(--mono); }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .layout { grid-template-columns: 1fr; }
+    aside { border-right: none; border-bottom: 1px solid var(--border); }
+    .metrics { grid-template-columns: repeat(3, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>NGO Loan Planner</h1>
+  <p>10-year repayment · ₪1,000,000 at ₪12,500/month · 30 founding families</p>
+</header>
+
+<div class="layout">
+
+<!-- ── Sidebar ── -->
+<aside>
+
+  <div class="sidebar-section">
+    <div class="section-label">Mode</div>
+    <div class="tab-bar" style="border:none; padding:0; margin-bottom:0.5rem;">
+      <div class="tab active" id="tab-single" onclick="setMode('single')">Single scenario</div>
+      <div class="tab" id="tab-compare" onclick="setMode('compare')">Compare A / B / C</div>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="section-label">Shared parameters</div>
+
+    <div class="ctrl">
+      <div class="ctrl-top">
+        <span class="ctrl-name">Ceiling / family</span>
+        <span class="ctrl-val" id="v-ceiling">₪20,000</span>
+      </div>
+      <input type="range" id="sl-ceiling" min="5000" max="40000" step="1000" value="20000">
+    </div>
+
+    <div class="ctrl">
+      <div class="ctrl-top">
+        <span class="ctrl-name">עליות / month</span>
+        <span class="ctrl-val" id="v-aliyot">₪1,000</span>
+      </div>
+      <input type="range" id="sl-aliyot" class="blue" min="0" max="6000" step="250" value="1000">
+    </div>
+
+    <div class="ctrl">
+      <div class="ctrl-top">
+        <span class="ctrl-name">השכרת אולם / month <span style="font-size:10px;">(from Mo 25)</span></span>
+        <span class="ctrl-val" id="v-hall">₪4,000</span>
+      </div>
+      <input type="range" id="sl-hall" class="amber" min="0" max="15000" step="500" value="4000">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="toggle-row">
+      <label class="toggle">
+        <input type="checkbox" id="tog-reinvest" checked>
+        <span class="toggle-track"></span>
+      </label>
+      <span class="toggle-label" id="tog-label">Surplus saved & reinvested</span>
+    </div>
+  </div>
+
+  <!-- Single scenario controls -->
+  <div id="single-controls" class="sidebar-section">
+    <div class="section-label">Scenario</div>
+
+    <div class="ctrl">
+      <div class="ctrl-top">
+        <span class="ctrl-name">New families (+ 30 existing)</span>
+        <span class="ctrl-val" id="v-extra">+0 (total 30)</span>
+      </div>
+      <input type="range" id="sl-extra" min="0" max="50" step="1" value="0">
+    </div>
+
+    <div class="ctrl">
+      <div class="ctrl-top">
+        <span class="ctrl-name">Monthly / family</span>
+        <span class="ctrl-val" id="v-monthly">₪350</span>
+      </div>
+      <input type="range" id="sl-monthly" class="purple" min="100" max="600" step="25" value="350">
+    </div>
+  </div>
+
+  <!-- Compare scenario controls -->
+  <div id="compare-controls" class="sidebar-section" style="display:none;">
+    <div class="section-label">Scenario A <span style="color:var(--blue);">●</span></div>
+    <div class="ctrl">
+      <div class="ctrl-top"><span class="ctrl-name">Families</span><span class="ctrl-val" id="v-fa">33</span></div>
+      <input type="range" id="sl-fa" min="30" max="55" step="1" value="33">
+    </div>
+    <div class="ctrl">
+      <div class="ctrl-top"><span class="ctrl-name">Monthly</span><span class="ctrl-val" id="v-ma">₪350</span></div>
+      <input type="range" id="sl-ma" min="300" max="500" step="25" value="350">
+    </div>
+
+    <div class="section-label" style="margin-top:1rem;">Scenario B <span style="color:var(--green);">●</span></div>
+    <div class="ctrl">
+      <div class="ctrl-top"><span class="ctrl-name">Families</span><span class="ctrl-val" id="v-fb">38</span></div>
+      <input type="range" id="sl-fb" min="30" max="55" step="1" value="38">
+    </div>
+    <div class="ctrl">
+      <div class="ctrl-top"><span class="ctrl-name">Monthly</span><span class="ctrl-val" id="v-mb">₪375</span></div>
+      <input type="range" id="sl-mb" min="300" max="500" step="25" value="375">
+    </div>
+
+    <div class="section-label" style="margin-top:1rem;">Scenario C <span style="color:var(--amber);">●</span></div>
+    <div class="ctrl">
+      <div class="ctrl-top"><span class="ctrl-name">Families</span><span class="ctrl-val" id="v-fc">42</span></div>
+      <input type="range" id="sl-fc" min="30" max="55" step="1" value="42">
+    </div>
+    <div class="ctrl">
+      <div class="ctrl-top"><span class="ctrl-name">Monthly</span><span class="ctrl-val" id="v-mc">₪400</span></div>
+      <input type="range" id="sl-mc" min="300" max="500" step="25" value="400">
+    </div>
+  </div>
+
+</aside>
+
+<!-- ── Main ── -->
+<main>
+
+  <!-- Metrics strip -->
+  <div class="metrics" id="metrics"></div>
+
+  <!-- Single panel -->
+  <div id="single-panel">
+    <div class="chart-area">
+
+      <div class="chart-block" style="flex:1.2;">
+        <div class="chart-header">
+          <span class="chart-title-text">Monthly income vs loan payment</span>
+          <div class="legend">
+            <div class="leg-item"><div class="leg-dot" style="background:var(--purple);"></div>Members</div>
+            <div class="leg-item"><div class="leg-dot" style="background:var(--blue);"></div>עליות</div>
+            <div class="leg-item"><div class="leg-dot" style="background:var(--amber);"></div>אולם</div>
+            <div class="leg-item"><div class="leg-dot" style="background:var(--red); opacity:0.7; border-top:2px dashed var(--red); height:0; width:14px;"></div>Loan</div>
+          </div>
+        </div>
+        <div class="chart-wrap" style="height:180px;"><canvas id="c-income"></canvas></div>
+      </div>
+
+      <div class="chart-block" style="flex:1;">
+        <div class="chart-header">
+          <span class="chart-title-text" id="reserve-title">Cumulative cash reserve</span>
+          <div class="legend">
+            <div class="leg-item"><div class="leg-dot" style="background:var(--green);"></div>Positive</div>
+            <div class="leg-item"><div class="leg-dot" style="background:var(--red);"></div>Shortfall</div>
+          </div>
+        </div>
+        <div class="chart-wrap" style="height:160px;"><canvas id="c-reserve"></canvas></div>
+      </div>
+
+      <div id="timeline-container"></div>
+
+    </div>
+  </div>
+
+  <!-- Compare panel -->
+  <div id="compare-panel">
+    <div class="chart-area">
+      <div id="compare-cards" class="scenario-grid"></div>
+      <div class="chart-block" style="flex:1.2;">
+        <div class="chart-header">
+          <span class="chart-title-text">Monthly income — all scenarios</span>
+          <div class="legend">
+            <div class="leg-item"><div class="leg-dot" style="background:var(--blue);"></div>A</div>
+            <div class="leg-item"><div class="leg-dot" style="background:var(--green);"></div>B</div>
+            <div class="leg-item"><div class="leg-dot" style="background:var(--amber);"></div>C</div>
+          </div>
+        </div>
+        <div class="chart-wrap" style="height:180px;"><canvas id="c-comp-income"></canvas></div>
+      </div>
+      <div class="chart-block" style="flex:1;">
+        <div class="chart-header">
+          <span class="chart-title-text">Cumulative cash reserve — all scenarios</span>
+        </div>
+        <div class="chart-wrap" style="height:180px;"><canvas id="c-comp-reserve"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+</div>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────────────────
+const REAL_REMAINING = [20000,27000,10000,20980,20250,20400,20500,21850,29500,
+  21250,18750,29750,29300,19250,15000,18250,21540,18750,27500,23814,20250,
+  20000,14000,21250,29500,29700,23920,25000,27000,8000];
+const DEFAULT_CEILING = 30000;
+const REAL_RATIOS = REAL_REMAINING.map(r => r / DEFAULT_CEILING);
+const MONTHS = 120;
+const LOAN   = 12500;
+const HALL_START = 25;
+
+const MONTHS_ARR = Array.from({length: MONTHS}, (_, i) => i + 1);
+const TICK_POS   = [1,12,24,36,48,60,72,84,96,108,120];
+const LABELS     = MONTHS_ARR.map(m => TICK_POS.includes(m) ? `Mo ${m}` : '');
+const TICK_OPTS  = { autoSkip:false, maxRotation:0, font:{size:9}, color:'#7a8099' };
+const GRID_OPTS  = { color:'rgba(255,255,255,0.05)' };
+const NIS_K      = (v,_) => (v<0?'-':'')+'₪'+Math.abs(Math.round(v/1000))+'k';
+
+// ── Compute ───────────────────────────────────────────────────────────────────
+function compute(extra, monthly, ceiling, aliyot, hall) {
+  const realD = REAL_RATIOS.map(r => Math.ceil(Math.round(r * ceiling) / monthly));
+  const newD  = Math.ceil(ceiling / monthly);
+  const realInc = MONTHS_ARR.map(mo => realD.filter(d => mo <= d).length * monthly);
+  const newInc  = MONTHS_ARR.map(mo => (mo <= newD ? extra * monthly : 0));
+  const alInc   = MONTHS_ARR.map(() => aliyot);
+  const haInc   = MONTHS_ARR.map(mo => mo >= HALL_START ? hall : 0);
+  const total   = MONTHS_ARR.map((_,i) => realInc[i]+newInc[i]+alInc[i]+haInc[i]);
+  const net     = total.map(t => t - LOAN);
+  const cum     = net.reduce((a,v,i) => { a.push((a[i-1]||0)+v); return a; }, []);
+  return { realInc, newInc, alInc, haInc, total, net, cum };
+}
+
+function transitions(series) {
+  const evts = [];
+  const start = series[0] < 0 ? 'Starts in deficit' : 'Starts in surplus';
+  evts.push({ label: start, month: 1, balance: series[0] });
+  for (let i = 1; i < series.length; i++) {
+    if (series[i-1] < 0 && series[i] >= 0)
+      evts.push({ label: 'Recovers to surplus', month: i+1, balance: series[i] });
+    else if (series[i-1] >= 0 && series[i] < 0)
+      evts.push({ label: 'Back to deficit', month: i+1, balance: series[i] });
+  }
+  evts.push({ label: 'End of period', month: 120, balance: series[119] });
+  return evts;
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let mode = 'single';
+let charts = {};
+
+function getShared() {
+  return {
+    ceiling: +document.getElementById('sl-ceiling').value,
+    aliyot:  +document.getElementById('sl-aliyot').value,
+    hall:    +document.getElementById('sl-hall').value,
+    reinvest: document.getElementById('tog-reinvest').checked,
+  };
+}
+
+// ── Render helpers ────────────────────────────────────────────────────────────
+function nis(v) { return '₪' + Math.round(v).toLocaleString(); }
+function statusCls(v, threshold) {
+  return v >= threshold ? 'good' : v >= threshold * 0.88 ? 'warn' : 'bad';
+}
+
+function destroyChart(key) {
+  if (charts[key]) { charts[key].destroy(); delete charts[key]; }
+}
+
+function makeChart(id, config) {
+  destroyChart(id);
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  charts[id] = new Chart(ctx, config);
+}
+
+// ── Single mode ───────────────────────────────────────────────────────────────
+function renderSingle() {
+  const { ceiling, aliyot, hall, reinvest } = getShared();
+  const extra   = +document.getElementById('sl-extra').value;
+  const monthly = +document.getElementById('sl-monthly').value;
+  const d = compute(extra, monthly, ceiling, aliyot, hall);
+  const reserve = reinvest ? d.cum : d.net;
+  const mo1  = d.realInc[0]  + d.newInc[0]  + aliyot;
+  const mo25 = d.realInc[24] + d.newInc[24] + aliyot + hall;
+  const surplusMos = d.net.filter(v => v >= 0).length;
+  const peak = Math.max(...reserve);
+  const peakMo = reserve.indexOf(peak) + 1;
+  const final = reserve[119];
+  const cumNeg = d.cum.findIndex(v => v < 0);
+
+  // Metrics
+  document.getElementById('metrics').innerHTML = [
+    { label: 'Mo 1 income',    value: nis(mo1),  cls: statusCls(mo1,  LOAN) },
+    { label: 'Mo 25 income',   value: nis(mo25), cls: statusCls(mo25, LOAN) },
+    { label: 'Surplus months', value: `${surplusMos} / 120`, cls: 'plain' },
+    { label: 'Peak reserve',   value: nis(peak) + ` Mo ${peakMo}`, cls: peak >= 0 ? 'good' : 'bad' },
+    { label: 'Final balance',  value: nis(final), cls: final >= 0 ? 'good' : 'bad' },
+    { label: 'Cash goes –',    value: cumNeg === -1 ? 'Never' : `Mo ${cumNeg+1}`, cls: cumNeg === -1 ? 'good' : 'bad' },
+  ].map(m => `<div class="metric"><div class="metric-label">${m.label}</div><div class="metric-value ${m.cls}">${m.value}</div></div>`).join('');
+
+  // Chart 1: stacked income
+  const stackedNew  = d.realInc.map((v,i) => v + d.newInc[i]);
+  const stackedAl   = stackedNew.map((v,i) => v + d.alInc[i]);
+  const stackedHall = stackedAl.map((v,i) => v + d.haInc[i]);
+
+  makeChart('c-income', {
+    type: 'line',
+    data: { labels: LABELS, datasets: [
+      { label:'Members', data: d.realInc, borderColor:'#9b8cff', backgroundColor:'rgba(155,140,255,0.15)', fill:'origin', pointRadius:0, borderWidth:1.5, tension:0.1 },
+      { label:'New',     data: stackedNew,  borderColor:'#9b8cff', backgroundColor:'rgba(155,140,255,0.08)', fill:'-1', pointRadius:0, borderWidth:0, tension:0.1 },
+      { label:'Aliyot',  data: stackedAl,   borderColor:'#4a9eff', backgroundColor:'rgba(74,158,255,0.12)', fill:'-1', pointRadius:0, borderWidth:1.5, tension:0.1 },
+      { label:'Hall',    data: stackedHall, borderColor:'#f5a623', backgroundColor:'rgba(245,166,35,0.12)', fill:'-1', pointRadius:0, borderWidth:1.5, tension:0.1 },
+      { label:'Loan',    data: Array(MONTHS).fill(LOAN), borderColor:'#ff5f57', borderDash:[5,4], pointRadius:0, borderWidth:1.5, fill:false, backgroundColor:'transparent' },
+    ]},
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${nis(ctx.parsed.y)}`}} },
+      scales:{ x:{ticks:TICK_OPTS,grid:GRID_OPTS}, y:{min:0,ticks:{font:{size:9},color:'#7a8099',callback:NIS_K},grid:GRID_OPTS} }
+    }
+  });
+
+  // Chart 2: reserve
+  document.getElementById('reserve-title').textContent =
+    reinvest ? 'Cumulative cash reserve' : 'Monthly net (no carryover)';
+
+  const posData = reserve.map(v => v >= 0 ? v : null);
+  const negData = reserve.map(v => v <  0 ? v : null);
+
+  makeChart('c-reserve', {
+    type: 'line',
+    data: { labels: LABELS, datasets: [
+      { data: posData, borderColor:'#2dd4a0', backgroundColor:'rgba(45,212,160,0.12)', fill:'origin', pointRadius:0, borderWidth:2, tension:0.1, spanGaps:true },
+      { data: negData, borderColor:'#ff5f57', backgroundColor:'rgba(255,95,87,0.12)',  fill:'origin', pointRadius:0, borderWidth:2, tension:0.1, spanGaps:true },
+    ]},
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>nis(ctx.parsed.y)}} },
+      scales:{ x:{ticks:TICK_OPTS,grid:GRID_OPTS}, y:{ticks:{font:{size:9},color:'#7a8099',callback:NIS_K},grid:GRID_OPTS} }
+    }
+  });
+
+  // Timeline
+  const evts = transitions(reserve);
+  const rows = evts.map(e => {
+    const isProb = e.label === 'Back to deficit';
+    const isGood = e.label === 'Recovers to surplus';
+    const balCls = e.balance >= 0 ? 'color:var(--green)' : 'color:var(--red)';
+    return `<div class="timeline-row">
+      <span class="timeline-event" style="${isProb?'color:var(--red)':isGood?'color:var(--green)':''}">${e.label}</span>
+      <span class="timeline-month">Mo ${e.month}</span>
+      <span class="timeline-balance" style="${balCls}">${nis(e.balance)}</span>
+    </div>`;
+  }).join('');
+
+  document.getElementById('timeline-container').innerHTML = `
+    <div class="timeline">
+      <div class="timeline-header">${reinvest ? 'Cash reserve' : 'Monthly net'} timeline</div>
+      ${rows}
+    </div>`;
+}
+
+// ── Compare mode ──────────────────────────────────────────────────────────────
+const CMP_COLORS  = ['#4a9eff','#2dd4a0','#f5a623'];
+const CMP_LABELS  = ['A','B','C'];
+const CMP_SL_FAM  = ['sl-fa','sl-fb','sl-fc'];
+const CMP_SL_MO   = ['sl-ma','sl-mb','sl-mc'];
+
+function renderCompare() {
+  const { ceiling, aliyot, hall, reinvest } = getShared();
+  const params = CMP_SL_FAM.map((fid, i) => ({
+    extra:   Math.max(0, +document.getElementById(fid).value - 30),
+    monthly: +document.getElementById(CMP_SL_MO[i]).value,
+    families: +document.getElementById(fid).value,
+  }));
+
+  const results = params.map(p => {
+    const d = compute(p.extra, p.monthly, ceiling, aliyot, hall);
+    const reserve = reinvest ? d.cum : d.net;
+    return { d, reserve,
+      mo1:  d.realInc[0]  + d.newInc[0]  + aliyot,
+      mo25: d.realInc[24] + d.newInc[24] + aliyot + hall,
+      surplusMos: d.net.filter(v => v >= 0).length,
+      peak: Math.max(...reserve),
+      final: reserve[119],
+      cumNeg: d.cum.findIndex(v => v < 0),
+    };
+  });
+
+  // Metrics (best scenario highlighted)
+  const bestIdx = results.reduce((bi, r, i) => r.final > results[bi].final ? i : bi, 0);
+  document.getElementById('metrics').innerHTML = results.map((r, i) => `
+    <div class="metric" style="${i===bestIdx?'border-bottom:2px solid '+CMP_COLORS[i]:''}">
+      <div class="metric-label" style="color:${CMP_COLORS[i]}">Scenario ${CMP_LABELS[i]} ${i===bestIdx?'★':''}</div>
+      <div class="metric-value ${statusCls(r.mo1, LOAN)}">${nis(r.mo1)}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px;">Mo 1 income</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label" style="color:${CMP_COLORS[i]}">Final balance</div>
+      <div class="metric-value ${r.final >= 0 ? 'good':'bad'}">${nis(r.final)}</div>
+    </div>
+  `).join('');
+
+  // Cards
+  const rows = ['Mo 1 income','Mo 25 income','Surplus months','Cash goes –','Peak reserve','Final balance'];
+  document.getElementById('compare-cards').innerHTML = results.map((r, i) => {
+    const vals = [
+      { v: nis(r.mo1),  cls: statusCls(r.mo1, LOAN) },
+      { v: nis(r.mo25), cls: statusCls(r.mo25, LOAN) },
+      { v: `${r.surplusMos} / 120`, cls: 'plain' },
+      { v: r.cumNeg === -1 ? 'Never' : `Mo ${r.cumNeg+1}`, cls: r.cumNeg === -1 ? 'good':'bad' },
+      { v: nis(r.peak), cls: r.peak >= 0 ? 'good':'bad' },
+      { v: nis(r.final), cls: r.final >= 0 ? 'good':'bad' },
+    ];
+    return `<div class="scenario-col">
+      <div class="scenario-col-title" style="color:${CMP_COLORS[i]}">
+        Scenario ${CMP_LABELS[i]} — ${params[i].families} fam · ₪${params[i].monthly}/mo
+      </div>
+      ${rows.map((label, j) => `
+        <div class="sc-metric">
+          <span class="sc-label">${label}</span>
+          <span class="sc-val" style="color:var(--${vals[j].cls==='good'?'green':vals[j].cls==='bad'?'red':vals[j].cls==='warn'?'amber':'text'})">${vals[j].v}</span>
+        </div>`).join('')}
+    </div>`;
+  }).join('');
+
+  // Chart: income comparison
+  makeChart('c-comp-income', {
+    type: 'line',
+    data: { labels: LABELS, datasets: [
+      ...results.map((r, i) => ({
+        label: `Scenario ${CMP_LABELS[i]}`,
+        data: r.d.total,
+        borderColor: CMP_COLORS[i],
+        backgroundColor: 'transparent',
+        pointRadius: 0, borderWidth: 2, tension: 0.1,
+      })),
+      { label:'Loan', data:Array(MONTHS).fill(LOAN), borderColor:'#ff5f57', borderDash:[5,4], pointRadius:0, borderWidth:1.5, fill:false, backgroundColor:'transparent' },
+    ]},
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${nis(ctx.parsed.y)}`}} },
+      scales:{ x:{ticks:TICK_OPTS,grid:GRID_OPTS}, y:{min:0,ticks:{font:{size:9},color:'#7a8099',callback:NIS_K},grid:GRID_OPTS} }
+    }
+  });
+
+  // Chart: reserve comparison
+  makeChart('c-comp-reserve', {
+    type: 'line',
+    data: { labels: LABELS, datasets: results.map((r, i) => ({
+      label: `Scenario ${CMP_LABELS[i]}`,
+      data: r.reserve,
+      borderColor: CMP_COLORS[i],
+      backgroundColor: CMP_COLORS[i] + '18',
+      fill: false, pointRadius: 0, borderWidth: 2, tension: 0.1,
+    }))},
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${nis(ctx.parsed.y)}`}} },
+      scales:{ x:{ticks:TICK_OPTS,grid:GRID_OPTS}, y:{ticks:{font:{size:9},color:'#7a8099',callback:NIS_K},grid:GRID_OPTS} }
+    }
+  });
+}
+
+// ── Mode switch ───────────────────────────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  document.getElementById('tab-single').classList.toggle('active', m==='single');
+  document.getElementById('tab-compare').classList.toggle('active', m==='compare');
+  document.getElementById('single-controls').style.display = m==='single' ? '' : 'none';
+  document.getElementById('compare-controls').style.display = m==='compare' ? '' : 'none';
+  document.getElementById('single-panel').classList.toggle('hidden', m!=='single');
+  document.getElementById('compare-panel').classList.toggle('visible', m==='compare');
+  render();
+}
+
+function render() {
+  if (mode === 'single') renderSingle(); else renderCompare();
+}
+
+// ── Wire up all sliders ───────────────────────────────────────────────────────
+function wire(id, outId, fmt) {
+  const sl = document.getElementById(id);
+  if (!sl) return;
+  sl.addEventListener('input', () => {
+    if (outId) document.getElementById(outId).textContent = fmt(+sl.value);
+    render();
+  });
+}
+
+wire('sl-ceiling', 'v-ceiling', v => '₪' + v.toLocaleString());
+wire('sl-aliyot',  'v-aliyot',  v => '₪' + v.toLocaleString());
+wire('sl-hall',    'v-hall',    v => '₪' + v.toLocaleString());
+wire('sl-extra',   'v-extra',   v => `+${v} (total ${30+v})`);
+wire('sl-monthly', 'v-monthly', v => '₪' + v.toLocaleString());
+wire('sl-fa', 'v-fa', v => String(v));
+wire('sl-fb', 'v-fb', v => String(v));
+wire('sl-fc', 'v-fc', v => String(v));
+wire('sl-ma', 'v-ma', v => '₪' + v.toLocaleString());
+wire('sl-mb', 'v-mb', v => '₪' + v.toLocaleString());
+wire('sl-mc', 'v-mc', v => '₪' + v.toLocaleString());
+
+document.getElementById('tog-reinvest').addEventListener('change', function() {
+  document.getElementById('tog-label').textContent =
+    this.checked ? 'Surplus saved & reinvested' : 'No carryover';
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
