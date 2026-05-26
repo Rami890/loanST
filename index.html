@@ -625,23 +625,62 @@ function renderSingle() {
     }
   });
 
-  // Chart 2: reserve
+  // Chart 2: reserve — single dataset with gradient fill (green above 0, red below)
   document.getElementById('reserve-title').textContent =
     reinvest ? 'Cumulative cash reserve' : 'Monthly net (no carryover)';
 
-  const posData = reserve.map(v => v >= 0 ? v : null);
-  const negData = reserve.map(v => v <  0 ? v : null);
+  // Inline plugin: fills green above zero, red below, with a sharp colour split at zero
+  const gradientFillPlugin = {
+    id: 'gradientFill',
+    beforeDraw(chart) {
+      const { ctx, chartArea: { top, bottom }, scales: { y } } = chart;
+      if (!y) return;
+      const zeroY = y.getPixelForValue(0);
+      const clampedZero = Math.max(top, Math.min(bottom, zeroY));
+      const ds = chart.data.datasets[0];
+      const grad = ctx.createLinearGradient(0, top, 0, bottom);
+      // proportion of chart height where zero sits
+      const zeroFrac = (clampedZero - top) / (bottom - top);
+      grad.addColorStop(0,           'rgba(45,212,160,0.25)');  // green top
+      grad.addColorStop(Math.max(0, zeroFrac - 0.001), 'rgba(45,212,160,0.10)');
+      grad.addColorStop(Math.min(1, zeroFrac + 0.001), 'rgba(255,95,87,0.10)');
+      grad.addColorStop(1,           'rgba(255,95,87,0.25)');   // red bottom
+      ds.backgroundColor = grad;
+    }
+  };
 
+  // Line colour also splits at zero using a segment colour callback
   makeChart('c-reserve', {
     type: 'line',
-    data: { labels: LABELS, datasets: [
-      { data: posData, borderColor:'#2dd4a0', backgroundColor:'rgba(45,212,160,0.12)', fill:'origin', pointRadius:0, borderWidth:2, tension:0.1, spanGaps:true },
-      { data: negData, borderColor:'#ff5f57', backgroundColor:'rgba(255,95,87,0.12)',  fill:'origin', pointRadius:0, borderWidth:2, tension:0.1, spanGaps:true },
-    ]},
-    options: { responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>nis(ctx.parsed.y)}} },
-      scales:{ x:{ticks:TICK_OPTS,grid:GRID_OPTS}, y:{ticks:{font:{size:9},color:'#7a8099',callback:NIS_K},grid:GRID_OPTS} }
-    }
+    data: { labels: LABELS, datasets: [{
+      data: reserve,
+      borderColor: ctx => {
+        if (!ctx.chart.scales || !ctx.chart.scales.y) return '#2dd4a0';
+        const v = ctx.parsed ? ctx.parsed.y : 0;
+        return v >= 0 ? '#2dd4a0' : '#ff5f57';
+      },
+      segment: {
+        borderColor: ctx => ctx.p1.parsed.y < 0 ? '#ff5f57' : '#2dd4a0',
+      },
+      fill: 'origin',
+      backgroundColor: 'rgba(45,212,160,0.15)',  // overridden by plugin
+      pointRadius: 0,
+      borderWidth: 2,
+      tension: 0.1,
+    }]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => nis(ctx.parsed.y) } },
+        gradientFill: {},
+      },
+      scales: {
+        x: { ticks: TICK_OPTS, grid: GRID_OPTS },
+        y: { ticks: { font:{size:9}, color:'#7a8099', callback: NIS_K }, grid: GRID_OPTS }
+      }
+    },
+    plugins: [gradientFillPlugin],
   });
 
   // Timeline
