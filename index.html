@@ -401,18 +401,6 @@
       <input type="range" id="sl-monthly" class="purple" min="100" max="600" step="25" value="350">
     </div>
 
-    <div class="divider"></div>
-    <div style="font-size:10px;color:var(--muted);margin-bottom:0.65rem;line-height:1.5;">
-      Reduced tier — ₪250/mo · ₪15,000 ceiling<br>
-      <span style="font-size:9px;opacity:0.7;">First N of the 30 families move to this tier</span>
-    </div>
-    <div class="ctrl">
-      <div class="ctrl-top">
-        <span class="ctrl-name">Families on reduced tier</span>
-        <span class="ctrl-val" id="v-tier2">0 of 30</span>
-      </div>
-      <input type="range" id="sl-tier2" min="0" max="30" step="1" value="0" style="accent-color:#2dd4a0;">
-    </div>
   </div>
 
   <!-- Compare scenario controls -->
@@ -464,8 +452,7 @@
         <div class="chart-header">
           <span class="chart-title-text">Monthly income vs loan payment</span>
           <div class="legend">
-            <div class="leg-item"><div class="leg-dot" style="background:var(--purple);"></div>Tier 1</div>
-            <div class="leg-item"><div class="leg-dot" style="background:var(--green);"></div>Tier 2 ₪250</div>
+            <div class="leg-item"><div class="leg-dot" style="background:var(--purple);"></div>Members</div>
             <div class="leg-item"><div class="leg-dot" style="background:var(--blue);"></div>עליות</div>
             <div class="leg-item"><div class="leg-dot" style="background:var(--amber);"></div>אולם</div>
             <div class="leg-item"><div class="leg-dot" style="background:var(--red); opacity:0.7; border-top:2px dashed var(--red); height:0; width:14px;"></div>Loan</div>
@@ -536,33 +523,17 @@ const GRID_OPTS  = { color:'rgba(255,255,255,0.05)' };
 const NIS_K      = (v,_) => (v<0?'-':'')+'₪'+Math.abs(Math.round(v/1000))+'k';
 
 // ── Compute ───────────────────────────────────────────────────────────────────
-// tier2count: how many of the 30 real families are on reduced tier
-// tier2 fixed: ₪250/month, ₪15,000 ceiling (both scaled by ratio)
-const TIER2_MONTHLY = 250;
-const TIER2_CEILING = 15000;
-
-function compute(extra, monthly, ceiling, aliyot, hall, tier2count) {
-  const t2 = tier2count || 0;
-  // First t2 families → tier 2 (₪250/mo, ₪15k ceiling), rest → tier 1
-  const realD = REAL_RATIOS.map((r, i) => {
-    if (i < t2) return Math.ceil(Math.round(r * TIER2_CEILING) / TIER2_MONTHLY);
-    return Math.ceil(Math.round(r * ceiling) / monthly);
-  });
-  const tier1Inc = MONTHS_ARR.map(mo =>
-    REAL_RATIOS.slice(t2).reduce((s, _, j) => s + (mo <= realD[t2+j] ? monthly : 0), 0)
-  );
-  const tier2Inc = MONTHS_ARR.map(mo =>
-    REAL_RATIOS.slice(0, t2).reduce((s, _, j) => s + (mo <= realD[j] ? TIER2_MONTHLY : 0), 0)
-  );
-  const realInc = MONTHS_ARR.map((_,i) => tier1Inc[i] + tier2Inc[i]);
+function compute(extra, monthly, ceiling, aliyot, hall) {
+  const realD = REAL_RATIOS.map(r => Math.ceil(Math.round(r * ceiling) / monthly));
   const newD  = Math.ceil(ceiling / monthly);
+  const realInc = MONTHS_ARR.map(mo => realD.filter(d => mo <= d).length * monthly);
   const newInc  = MONTHS_ARR.map(mo => (mo <= newD ? extra * monthly : 0));
   const alInc   = MONTHS_ARR.map(() => aliyot);
   const haInc   = MONTHS_ARR.map(mo => mo >= HALL_START ? hall : 0);
   const total   = MONTHS_ARR.map((_,i) => realInc[i]+newInc[i]+alInc[i]+haInc[i]);
   const net     = total.map(t => t - LOAN);
   const cum     = net.reduce((a,v,i) => { a.push((a[i-1]||0)+v); return a; }, []);
-  return { tier1Inc, tier2Inc, realInc, newInc, alInc, haInc, total, net, cum };
+  return { realInc, newInc, alInc, haInc, total, net, cum };
 }
 
 function transitions(series) {
@@ -614,8 +585,7 @@ function renderSingle() {
   const { ceiling, aliyot, hall, reinvest } = getShared();
   const extra   = +document.getElementById('sl-extra').value;
   const monthly = +document.getElementById('sl-monthly').value;
-  const tier2   = +document.getElementById('sl-tier2').value;
-  const d = compute(extra, monthly, ceiling, aliyot, hall, tier2);
+  const d = compute(extra, monthly, ceiling, aliyot, hall);
   const reserve = reinvest ? d.cum : d.net;
   const mo1  = d.realInc[0]  + d.newInc[0]  + aliyot;
   const mo25 = d.realInc[24] + d.newInc[24] + aliyot + hall;
@@ -636,20 +606,18 @@ function renderSingle() {
   ].map(m => `<div class="metric"><div class="metric-label">${m.label}</div><div class="metric-value ${m.cls}">${m.value}</div></div>`).join('');
 
   // Chart 1: stacked income
-  const stackedT2   = d.tier1Inc.map((v,i) => v + d.tier2Inc[i]);
-  const stackedNew  = stackedT2.map((v,i) => v + d.newInc[i]);
+  const stackedNew  = d.realInc.map((v,i) => v + d.newInc[i]);
   const stackedAl   = stackedNew.map((v,i) => v + d.alInc[i]);
   const stackedHall = stackedAl.map((v,i) => v + d.haInc[i]);
 
   makeChart('c-income', {
     type: 'line',
     data: { labels: LABELS, datasets: [
-      { label:'Tier 1 members', data: d.tier1Inc, borderColor:'#9b8cff', backgroundColor:'rgba(155,140,255,0.18)', fill:'origin', pointRadius:0, borderWidth:1.5, tension:0.1 },
-      { label:'Tier 2 (₪250)', data: stackedT2,  borderColor:'#2dd4a0', backgroundColor:'rgba(45,212,160,0.12)', fill:'-1', pointRadius:0, borderWidth:1.5, tension:0.1 },
-      { label:'New families',  data: stackedNew,  borderColor:'#9b8cff', backgroundColor:'rgba(155,140,255,0.06)', fill:'-1', pointRadius:0, borderWidth:0, tension:0.1 },
-      { label:'Aliyot',        data: stackedAl,   borderColor:'#4a9eff', backgroundColor:'rgba(74,158,255,0.12)', fill:'-1', pointRadius:0, borderWidth:1.5, tension:0.1 },
-      { label:'Hall',          data: stackedHall, borderColor:'#f5a623', backgroundColor:'rgba(245,166,35,0.12)', fill:'-1', pointRadius:0, borderWidth:1.5, tension:0.1 },
-      { label:'Loan',          data: Array(MONTHS).fill(LOAN), borderColor:'#ff5f57', borderDash:[5,4], pointRadius:0, borderWidth:1.5, fill:false, backgroundColor:'transparent' },
+      { label:'Members', data: d.realInc, borderColor:'#9b8cff', backgroundColor:'rgba(155,140,255,0.15)', fill:'origin', pointRadius:0, borderWidth:1.5, tension:0.1 },
+      { label:'New',     data: stackedNew,  borderColor:'#9b8cff', backgroundColor:'rgba(155,140,255,0.08)', fill:'-1', pointRadius:0, borderWidth:0, tension:0.1 },
+      { label:'Aliyot',  data: stackedAl,   borderColor:'#4a9eff', backgroundColor:'rgba(74,158,255,0.12)', fill:'-1', pointRadius:0, borderWidth:1.5, tension:0.1 },
+      { label:'Hall',    data: stackedHall, borderColor:'#f5a623', backgroundColor:'rgba(245,166,35,0.12)', fill:'-1', pointRadius:0, borderWidth:1.5, tension:0.1 },
+      { label:'Loan',    data: Array(MONTHS).fill(LOAN), borderColor:'#ff5f57', borderDash:[5,4], pointRadius:0, borderWidth:1.5, fill:false, backgroundColor:'transparent' },
     ]},
     options: { responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${nis(ctx.parsed.y)}`}} },
@@ -842,7 +810,7 @@ wire('sl-aliyot',  'v-aliyot',  v => '₪' + v.toLocaleString());
 wire('sl-hall',    'v-hall',    v => '₪' + v.toLocaleString());
 wire('sl-extra',   'v-extra',   v => `+${v} (total ${30+v})`);
 wire('sl-monthly', 'v-monthly', v => '₪' + v.toLocaleString());
-wire('sl-tier2',   'v-tier2',   v => `${v} of 30`);
+
 wire('sl-fa', 'v-fa', v => String(v));
 wire('sl-fb', 'v-fb', v => String(v));
 wire('sl-fc', 'v-fc', v => String(v));
