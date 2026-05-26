@@ -62,7 +62,7 @@
     display: grid;
     grid-template-columns: 280px 1fr;
     gap: 0;
-    min-height: calc(100vh - 70px);
+    align-items: start;
   }
 
   /* ── Sidebar ── */
@@ -71,6 +71,9 @@
     border-right: 1px solid var(--border);
     padding: 1.5rem 1.25rem;
     overflow-y: auto;
+    position: sticky;
+    top: 0;
+    max-height: 100vh;
   }
 
   .sidebar-section {
@@ -190,11 +193,10 @@
   main {
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow-y: auto;
   }
 
   .chart-area {
-    flex: 1;
     padding: 1.25rem 1.5rem;
     display: flex;
     flex-direction: column;
@@ -264,6 +266,47 @@
   .timeline-event { color: var(--text); }
   .timeline-month { font-family: var(--mono); color: var(--muted); white-space: nowrap; }
   .timeline-balance { font-family: var(--mono); font-size: 11px; white-space: nowrap; }
+
+  /* ── Monthly breakdown table ── */
+  .monthly-table-wrap {
+    margin-top: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .monthly-table-wrap table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+  .monthly-table-wrap thead tr {
+    background: var(--surface2);
+  }
+  .monthly-table-wrap th {
+    padding: 0.55rem 0.75rem;
+    text-align: right;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    white-space: nowrap;
+  }
+  .monthly-table-wrap th:first-child { text-align: left; }
+  .monthly-table-wrap td {
+    padding: 0.45rem 0.75rem;
+    text-align: right;
+    font-family: var(--mono);
+    color: var(--text);
+    border-top: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .monthly-table-wrap td:first-child { text-align: left; color: var(--muted); }
+  .monthly-table-wrap tr.deficit td { background: rgba(255,95,87,0.05); }
+  .monthly-table-wrap td.pos { color: var(--green); }
+  .monthly-table-wrap td.neg { color: var(--red); }
+  .monthly-table-wrap td.dropout { color: var(--amber); }
 
   /* ── Scenario tabs ── */
   .tab-bar {
@@ -473,6 +516,8 @@
       </div>
 
       <div id="timeline-container"></div>
+
+      <div id="monthly-table-container"></div>
 
     </div>
   </div>
@@ -701,6 +746,56 @@ function renderSingle() {
       <div class="timeline-header">${reinvest ? 'Cash reserve' : 'Monthly net'} timeline</div>
       ${rows}
     </div>`;
+
+  // Monthly breakdown table
+  const prevActive = [30];  // track active family count changes
+  let tableRows = '';
+  for (let i = 0; i < MONTHS; i++) {
+    const mo       = i + 1;
+    const famInc   = d.realInc[i] + d.newInc[i];
+    const otherInc = d.alInc[i] + d.haInc[i];
+    const totalInc = famInc + otherInc;
+    const netVal   = d.net[i];
+    const cumVal   = d.cum[i];
+    const isDeficit = netVal < 0;
+
+    // Detect dropout — family income dropped from previous month
+    const famDropped = i > 0 && (d.realInc[i] + d.newInc[i]) < (d.realInc[i-1] + d.newInc[i-1]);
+    const hallStart  = mo === HALL_START;
+
+    const netCls  = netVal  >= 0 ? 'pos' : 'neg';
+    const cumCls  = cumVal  >= 0 ? 'pos' : 'neg';
+    const famCls  = famDropped ? 'dropout' : '';
+
+    tableRows += `<tr class="${isDeficit ? 'deficit' : ''}">
+      <td>Mo ${String(mo).padStart(3,'0')}${hallStart ? ' ★' : ''}</td>
+      <td class="${famCls}">₪${famInc.toLocaleString()}</td>
+      <td>₪${otherInc.toLocaleString()}</td>
+      <td>₪${LOAN.toLocaleString()}</td>
+      <td class="${netCls}">${netVal >= 0 ? '+' : ''}₪${netVal.toLocaleString()}</td>
+      <td class="${cumCls}">₪${cumVal.toLocaleString()}</td>
+    </tr>`;
+  }
+
+  document.getElementById('monthly-table-container').innerHTML = `
+    <div class="monthly-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th>Family income</th>
+            <th>Other income</th>
+            <th>Loan payment</th>
+            <th>Net</th>
+            <th>Cumulative</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+    <p style="font-size:10px;color:var(--muted);margin:4px 0 0 4px;">
+      ★ Hall rental starts · Amber = family dropout month · Red rows = monthly deficit
+    </p>`;
 }
 
 // ── Compare mode ──────────────────────────────────────────────────────────────
